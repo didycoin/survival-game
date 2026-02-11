@@ -612,6 +612,30 @@ function setupEventListeners() {
                     const building = BUILDINGS[buildId];
                     enterBuildMode(buildId, building);
                 }
+            } else if (e.key.toLowerCase() === 'c') {
+                // C key closes any open menu
+                e.preventDefault();
+                document.getElementById('crafting-menu').style.display = 'none';
+                document.getElementById('build-menu').style.display = 'none';
+                if (gameState.buildMode) {
+                    gameState.buildMode = false;
+                    if (gameState.buildingPreview) {
+                        scene.remove(gameState.buildingPreview);
+                        gameState.buildingPreview = null;
+                    }
+                }
+            } else if (e.key.toLowerCase() === 'b') {
+                // B key closes any open menu
+                e.preventDefault();
+                document.getElementById('crafting-menu').style.display = 'none';
+                document.getElementById('build-menu').style.display = 'none';
+                if (gameState.buildMode) {
+                    gameState.buildMode = false;
+                    if (gameState.buildingPreview) {
+                        scene.remove(gameState.buildingPreview);
+                        gameState.buildingPreview = null;
+                    }
+                }
             }
             return; // Don't process other keys when menu is open
         }
