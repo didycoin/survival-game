@@ -36,7 +36,8 @@ const gameState = {
     lastChunkX: 0,
     lastChunkZ: 0,
     selectedCraftIndex: 0,
-    selectedBuildIndex: 0
+    selectedBuildIndex: 0,
+    equippedItem: null // Currently equipped tool/weapon
 };
 
 // Crafting Recipes
@@ -575,6 +576,61 @@ function setupEventListeners() {
         const isCraftingOpen = craftingMenu.style.display !== 'none';
         const isBuildOpen = buildMenu.style.display !== 'none';
         
+        // Handle C and B keys FIRST - they should work whether menu is open or not
+        if (e.key.toLowerCase() === 'c') {
+            e.preventDefault();
+            // Toggle crafting menu
+            if (isCraftingOpen) {
+                craftingMenu.style.display = 'none';
+            } else {
+                craftingMenu.style.display = 'block';
+                gameState.selectedCraftIndex = 0;
+                updateCraftingDisplay();
+            }
+            // Close build menu if open
+            if (isBuildOpen) {
+                buildMenu.style.display = 'none';
+                if (gameState.buildMode) {
+                    gameState.buildMode = false;
+                    if (gameState.buildingPreview) {
+                        scene.remove(gameState.buildingPreview);
+                        gameState.buildingPreview = null;
+                    }
+                }
+            }
+            return;
+        }
+        
+        if (e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            // Close crafting menu if open
+            if (isCraftingOpen) {
+                craftingMenu.style.display = 'none';
+            }
+            // Toggle build menu
+            if (isBuildOpen) {
+                buildMenu.style.display = 'none';
+                if (gameState.buildMode) {
+                    gameState.buildMode = false;
+                    if (gameState.buildingPreview) {
+                        scene.remove(gameState.buildingPreview);
+                        gameState.buildingPreview = null;
+                    }
+                }
+            } else {
+                // Check if player has building plan
+                if (!gameState.inventory['buildingplan'] || gameState.inventory['buildingplan'] < 1) {
+                    showMessage('You need a Building Plan to build! (Craft one first)');
+                } else {
+                    buildMenu.style.display = 'block';
+                    gameState.selectedBuildIndex = 0;
+                    updateBuildingDisplay();
+                }
+            }
+            return;
+        }
+        
+        // Arrow key navigation only when a menu is actually open
         if (isCraftingOpen || isBuildOpen) {
             const recipes = isCraftingOpen ? Object.keys(RECIPES) : Object.keys(BUILDINGS);
             const maxIndex = recipes.length - 1;
@@ -612,67 +668,12 @@ function setupEventListeners() {
                     const building = BUILDINGS[buildId];
                     enterBuildMode(buildId, building);
                 }
-            } else if (e.key.toLowerCase() === 'c') {
-                // C key closes any open menu
-                e.preventDefault();
-                document.getElementById('crafting-menu').style.display = 'none';
-                document.getElementById('build-menu').style.display = 'none';
-                if (gameState.buildMode) {
-                    gameState.buildMode = false;
-                    if (gameState.buildingPreview) {
-                        scene.remove(gameState.buildingPreview);
-                        gameState.buildingPreview = null;
-                    }
-                }
-            } else if (e.key.toLowerCase() === 'b') {
-                // B key closes any open menu
-                e.preventDefault();
-                document.getElementById('crafting-menu').style.display = 'none';
-                document.getElementById('build-menu').style.display = 'none';
-                if (gameState.buildMode) {
-                    gameState.buildMode = false;
-                    if (gameState.buildingPreview) {
-                        scene.remove(gameState.buildingPreview);
-                        gameState.buildingPreview = null;
-                    }
-                }
             }
             return; // Don't process other keys when menu is open
         }
         
         if (e.key.toLowerCase() === 'e' && gameState.canInteract && gameState.nearestObject) {
             interactWithObject(gameState.nearestObject);
-        }
-        
-        if (e.key.toLowerCase() === 'c') {
-            // Close build menu if it's open
-            const buildMenu = document.getElementById('build-menu');
-            if (buildMenu.style.display !== 'none') {
-                buildMenu.style.display = 'none';
-                if (gameState.buildMode) {
-                    gameState.buildMode = false;
-                    if (gameState.buildingPreview) {
-                        scene.remove(gameState.buildingPreview);
-                        gameState.buildingPreview = null;
-                    }
-                }
-            }
-            // Toggle crafting menu
-            toggleCraftingMenu();
-        }
-        
-        if (e.key.toLowerCase() === 'b') {
-            if (gameState.buildMode) {
-                // Exit build mode
-                gameState.buildMode = false;
-                if (gameState.buildingPreview) {
-                    scene.remove(gameState.buildingPreview);
-                    gameState.buildingPreview = null;
-                }
-                showMessage('Build mode cancelled');
-            } else {
-                toggleBuildMenu();
-            }
         }
         
         if (e.key.toLowerCase() === 'q' && gameState.buildMode) {
@@ -843,7 +844,21 @@ function interactWithObject(object) {
     if (!object.userData.type) return;
 
     const resource = object.userData.resource;
-    const amount = object.userData.amount;
+    let amount = object.userData.amount;
+    
+    // Equipped tools give bonus resources
+    if (gameState.equippedItem === 'axe' && object.userData.type === 'tree') {
+        amount += 2; // Axe gives +2 wood
+        showMessage(`Axe bonus! +${amount} ${resource}`);
+    } else if (gameState.equippedItem === 'pickaxe' && object.userData.type === 'rock') {
+        amount += 2; // Pickaxe gives +2 stone
+        showMessage(`Pickaxe bonus! +${amount} ${resource}`);
+    } else if (gameState.equippedItem === 'spear' && object.userData.type === 'animal') {
+        amount += 1; // Spear gives +1 meat
+        showMessage(`Spear bonus! +${amount} ${resource}`);
+    } else {
+        showMessage(`+${amount} ${resource}`);
+    }
 
     // Add to inventory
     if (!gameState.inventory[resource]) {
@@ -851,7 +866,6 @@ function interactWithObject(object) {
     }
     gameState.inventory[resource] += amount;
 
-    showMessage(`+${amount} ${resource}`);
     updateInventoryDisplay();
 
     // Remove object
@@ -870,6 +884,7 @@ function updateInventoryDisplay() {
     container.innerHTML = '';
 
     const consumables = ['rawberries', 'cookedmeat', 'waterbottle'];
+    const equipables = ['axe', 'pickaxe', 'spear', 'torch'];
     let slotNumber = 1;
 
     for (const [item, count] of Object.entries(gameState.inventory)) {
@@ -878,15 +893,37 @@ function updateInventoryDisplay() {
             itemDiv.className = 'inventory-item';
             
             const isConsumable = consumables.includes(item);
+            const isEquipable = equipables.includes(item);
+            const isEquipped = gameState.equippedItem === item;
+            
+            if (isEquipped) itemDiv.classList.add('equipped');
+            if (isEquipable) itemDiv.classList.add('equipable');
+            if (isConsumable) itemDiv.classList.add('consumable');
+            
             const slotDisplay = isConsumable ? `[${slotNumber}] ` : '';
+            const equippedDisplay = isEquipped ? ' ⚔ EQUIPPED' : '';
             
             itemDiv.innerHTML = `
-                <span>${slotDisplay}${item}</span>
+                <span>${slotDisplay}${item}${equippedDisplay}</span>
                 <span class="item-count">${count}</span>
             `;
             
+            // Click to equip/unequip
+            if (isEquipable) {
+                itemDiv.style.cursor = 'pointer';
+                itemDiv.addEventListener('click', () => {
+                    if (gameState.equippedItem === item) {
+                        gameState.equippedItem = null;
+                        showMessage(`Unequipped ${item}`);
+                    } else {
+                        gameState.equippedItem = item;
+                        showMessage(`Equipped ${item}`);
+                    }
+                    updateInventoryDisplay();
+                });
+            }
+            
             if (isConsumable) {
-                itemDiv.style.background = 'rgba(100, 200, 100, 0.2)';
                 slotNumber++;
             }
             
