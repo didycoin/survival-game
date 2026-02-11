@@ -403,7 +403,7 @@ function setupEventListeners() {
 }
 
 let mouseMovement = { x: 0, y: 0 };
-let pitch = 0; // Up/down rotation
+let pitch = 0; // Up/down look (clamped to -90 to +90)
 let yaw = 0;   // Left/right rotation
 
 function onMouseMove(event) {
@@ -422,55 +422,60 @@ function onWindowResize() {
 function startGame() {
     document.getElementById('start-screen').style.display = 'none';
     renderer.domElement.requestPointerLock();
+    
+    // Initialize camera angles
+    pitch = 0;
+    yaw = 0;
+    
     animate();
     updateSurvivalStats();
 }
 
 function updateCamera() {
     if (document.pointerLockElement === renderer.domElement) {
-        // Update pitch and yaw based on mouse movement
+        // Update yaw (left/right) - can spin 360 degrees
         yaw -= mouseMovement.x * CONFIG.MOUSE_SENSITIVITY;
-        pitch += mouseMovement.y * CONFIG.MOUSE_SENSITIVITY;
         
-        // Clamp pitch to prevent flipping
-        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        // Update pitch (up/down) - clamped to -90 to +90 degrees
+        pitch -= mouseMovement.y * CONFIG.MOUSE_SENSITIVITY;
         
-        // Apply rotation using Euler angles in the correct order (YXZ)
-        camera.rotation.order = 'YXZ';
-        camera.rotation.y = yaw;
-        camera.rotation.x = pitch;
-        camera.rotation.z = 0; // Never roll the camera
+        // Clamp pitch: -90 degrees (straight down at feet) to +90 degrees (straight up at sky)
+        const maxPitch = Math.PI / 2 - 0.01; // Just before vertical
+        pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
         
         mouseMovement.x = 0;
         mouseMovement.y = 0;
     }
 
-    // Movement - get direction from camera's rotation
-    const direction = new THREE.Vector3();
-    const right = new THREE.Vector3();
+    // Apply camera rotation
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = yaw;
+    camera.rotation.x = pitch;
+    camera.rotation.z = 0;
 
-    // Get forward direction (ignoring pitch for movement)
-    direction.set(
-        -Math.sin(yaw),
+    // Movement direction based on where you're facing (yaw only, not pitch)
+    const forward = new THREE.Vector3(
+        Math.sin(yaw),
         0,
-        -Math.cos(yaw)
-    ).normalize();
-
-    // Get right direction
-    right.set(
-        Math.cos(yaw),
+        Math.cos(yaw)
+    );
+    
+    const right = new THREE.Vector3(
+        Math.sin(yaw + Math.PI / 2),
         0,
-        -Math.sin(yaw)
-    ).normalize();
+        Math.cos(yaw + Math.PI / 2)
+    );
 
     const moveVector = new THREE.Vector3();
 
-    if (controls['w']) moveVector.add(direction);
-    if (controls['s']) moveVector.sub(direction);
+    if (controls['w']) moveVector.add(forward);
+    if (controls['s']) moveVector.sub(forward);
     if (controls['d']) moveVector.add(right);
     if (controls['a']) moveVector.sub(right);
 
-    moveVector.normalize().multiplyScalar(CONFIG.MOVE_SPEED);
+    if (moveVector.length() > 0) {
+        moveVector.normalize().multiplyScalar(CONFIG.MOVE_SPEED);
+    }
 
     // Apply gravity
     gameState.velocity.y -= CONFIG.GRAVITY;
