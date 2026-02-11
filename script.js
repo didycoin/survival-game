@@ -266,15 +266,25 @@ function generateChunk(chunkX, chunkZ) {
     };
     
     // Ground - positioned at chunk origin, no gaps
-    const groundGeometry = new THREE.PlaneGeometry(CONFIG.CHUNK_SIZE, CONFIG.CHUNK_SIZE, 20, 20);
-    
-    // Add procedural height variation using chunk-specific seed
-    const chunkSeed = CONFIG.SEED + chunkX * 1000 + chunkZ;
-    const chunkRandom = new SeededRandom(chunkSeed);
+    const segments = 25; // Higher resolution for smoother terrain
+    const groundGeometry = new THREE.PlaneGeometry(CONFIG.CHUNK_SIZE, CONFIG.CHUNK_SIZE, segments, segments);
     
     const vertices = groundGeometry.attributes.position.array;
+    
+    // Use world coordinates for vertex heights to ensure seamless chunk borders
     for (let i = 0; i < vertices.length; i += 3) {
-        vertices[i + 2] = chunkRandom.random() * 1.5 - 0.3;
+        const localX = vertices[i];
+        const localZ = vertices[i + 1];
+        
+        // Calculate world position for this vertex
+        const worldX = chunkX * CONFIG.CHUNK_SIZE + localX;
+        const worldZ = chunkZ * CONFIG.CHUNK_SIZE + localZ;
+        
+        // Use world position for consistent height across chunk boundaries
+        const heightSeed = CONFIG.SEED + Math.floor(worldX * 10) + Math.floor(worldZ * 10) * 1000;
+        const heightRandom = new SeededRandom(heightSeed);
+        
+        vertices[i + 2] = heightRandom.random() * 1.5 - 0.3;
     }
     groundGeometry.attributes.position.needsUpdate = true;
     groundGeometry.computeVertexNormals();
@@ -293,6 +303,10 @@ function generateChunk(chunkX, chunkZ) {
     
     scene.add(ground);
     chunk.objects.push(ground);
+    
+    // Create random generator for object placement in this chunk
+    const chunkSeed = CONFIG.SEED + chunkX * 1000 + chunkZ;
+    const chunkRandom = new SeededRandom(chunkSeed);
     
     // Add trees to chunk
     const treesPerChunk = Math.floor(CONFIG.TREE_COUNT / 9); // Distribute trees
@@ -521,18 +535,22 @@ function setupEventListeners() {
                 if (isCraftingOpen) {
                     gameState.selectedCraftIndex = Math.min(gameState.selectedCraftIndex + 1, maxIndex);
                     updateCraftingDisplay();
+                    scrollToSelected('crafting-recipes');
                 } else {
                     gameState.selectedBuildIndex = Math.min(gameState.selectedBuildIndex + 1, maxIndex);
                     updateBuildingDisplay();
+                    scrollToSelected('building-options');
                 }
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 if (isCraftingOpen) {
                     gameState.selectedCraftIndex = Math.max(gameState.selectedCraftIndex - 1, 0);
                     updateCraftingDisplay();
+                    scrollToSelected('crafting-recipes');
                 } else {
                     gameState.selectedBuildIndex = Math.max(gameState.selectedBuildIndex - 1, 0);
                     updateBuildingDisplay();
+                    scrollToSelected('building-options');
                 }
             } else if (e.key === 'Enter') {
                 e.preventDefault();
@@ -832,6 +850,18 @@ function toggleCraftingMenu() {
     if (!isVisible) {
         gameState.selectedCraftIndex = 0;
         updateCraftingDisplay();
+    }
+}
+
+function scrollToSelected(containerId) {
+    const container = document.getElementById(containerId);
+    const selected = container.querySelector('.recipe-item.selected');
+    
+    if (selected) {
+        selected.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
+        });
     }
 }
 
