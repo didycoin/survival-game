@@ -189,7 +189,7 @@ body {
 }
 
 /* Crafting Menu */
-#crafting-menu {
+#crafting-menu, #build-menu {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -204,13 +204,13 @@ body {
     overflow-y: auto;
 }
 
-#crafting-menu h3 {
+#crafting-menu h3, #build-menu h3 {
     margin-bottom: 15px;
     border-bottom: 2px solid rgba(255, 255, 255, 0.3);
     padding-bottom: 10px;
 }
 
-#crafting-recipes {
+#crafting-recipes, #building-options {
     margin-bottom: 15px;
 }
 
@@ -243,7 +243,7 @@ body {
     color: #aaa;
 }
 
-#close-crafting {
+#close-crafting, #close-build {
     width: 100%;
     padding: 10px;
     background: rgba(255, 255, 255, 0.2);
@@ -254,7 +254,7 @@ body {
     font-size: 1em;
 }
 
-#close-crafting:hover {
+#close-crafting:hover, #close-build:hover {
     background: rgba(255, 255, 255, 0.3);
 }
 
