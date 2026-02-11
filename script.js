@@ -34,7 +34,9 @@ const gameState = {
     placedBuildings: [],
     chunks: {}, // For terrain generation
     lastChunkX: 0,
-    lastChunkZ: 0
+    lastChunkZ: 0,
+    selectedCraftIndex: 0,
+    selectedBuildIndex: 0
 };
 
 // Crafting Recipes
@@ -263,7 +265,7 @@ function generateChunk(chunkX, chunkZ) {
         objects: []
     };
     
-    // Ground
+    // Ground - positioned at chunk origin, no gaps
     const groundGeometry = new THREE.PlaneGeometry(CONFIG.CHUNK_SIZE, CONFIG.CHUNK_SIZE, 20, 20);
     
     // Add procedural height variation using chunk-specific seed
@@ -283,7 +285,9 @@ function generateChunk(chunkX, chunkZ) {
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
+    // Position at exact chunk coordinates - no offset
     ground.position.x = chunkX * CONFIG.CHUNK_SIZE;
+    ground.position.y = 0;
     ground.position.z = chunkZ * CONFIG.CHUNK_SIZE;
     ground.receiveShadow = true;
     
@@ -293,8 +297,8 @@ function generateChunk(chunkX, chunkZ) {
     // Add trees to chunk
     const treesPerChunk = Math.floor(CONFIG.TREE_COUNT / 9); // Distribute trees
     for (let i = 0; i < treesPerChunk; i++) {
-        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
-        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
         const tree = createTree(x, z);
         chunk.objects.push(tree);
     }
@@ -302,8 +306,8 @@ function generateChunk(chunkX, chunkZ) {
     // Add rocks to chunk
     const rocksPerChunk = Math.floor(CONFIG.ROCK_COUNT / 9);
     for (let i = 0; i < rocksPerChunk; i++) {
-        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
-        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
         const rock = createRock(x, z);
         chunk.objects.push(rock);
     }
@@ -311,8 +315,8 @@ function generateChunk(chunkX, chunkZ) {
     // Add berry bushes
     const bushesPerChunk = 3;
     for (let i = 0; i < bushesPerChunk; i++) {
-        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
-        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
         const bush = createBerryBush(x, z);
         chunk.objects.push(bush);
     }
@@ -320,8 +324,8 @@ function generateChunk(chunkX, chunkZ) {
     // Add animals
     const animalsPerChunk = 2;
     for (let i = 0; i < animalsPerChunk; i++) {
-        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
-        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.8;
         const animal = createAnimal(x, z);
         chunk.objects.push(animal);
     }
@@ -502,6 +506,49 @@ function setupEventListeners() {
     document.addEventListener('keydown', (e) => {
         controls[e.key.toLowerCase()] = true;
         
+        // Menu navigation
+        const craftingMenu = document.getElementById('crafting-menu');
+        const buildMenu = document.getElementById('build-menu');
+        const isCraftingOpen = craftingMenu.style.display !== 'none';
+        const isBuildOpen = buildMenu.style.display !== 'none';
+        
+        if (isCraftingOpen || isBuildOpen) {
+            const recipes = isCraftingOpen ? Object.keys(RECIPES) : Object.keys(BUILDINGS);
+            const maxIndex = recipes.length - 1;
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (isCraftingOpen) {
+                    gameState.selectedCraftIndex = Math.min(gameState.selectedCraftIndex + 1, maxIndex);
+                    updateCraftingDisplay();
+                } else {
+                    gameState.selectedBuildIndex = Math.min(gameState.selectedBuildIndex + 1, maxIndex);
+                    updateBuildingDisplay();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (isCraftingOpen) {
+                    gameState.selectedCraftIndex = Math.max(gameState.selectedCraftIndex - 1, 0);
+                    updateCraftingDisplay();
+                } else {
+                    gameState.selectedBuildIndex = Math.max(gameState.selectedBuildIndex - 1, 0);
+                    updateBuildingDisplay();
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (isCraftingOpen) {
+                    const recipeId = recipes[gameState.selectedCraftIndex];
+                    const recipe = RECIPES[recipeId];
+                    craftItem(recipeId, recipe);
+                } else {
+                    const buildId = recipes[gameState.selectedBuildIndex];
+                    const building = BUILDINGS[buildId];
+                    enterBuildMode(buildId, building);
+                }
+            }
+            return; // Don't process other keys when menu is open
+        }
+        
         if (e.key.toLowerCase() === 'e' && gameState.canInteract && gameState.nearestObject) {
             interactWithObject(gameState.nearestObject);
         }
@@ -663,11 +710,8 @@ function updateCamera() {
         gameState.velocity.y = 0;
         gameState.isJumping = false;
     }
-
-    // Boundary check
-    const boundary = CONFIG.TERRAIN_SIZE / 2 - 2;
-    camera.position.x = Math.max(-boundary, Math.min(boundary, camera.position.x));
-    camera.position.z = Math.max(-boundary, Math.min(boundary, camera.position.z));
+    
+    // No boundaries - infinite world!
 }
 
 function checkInteraction() {
@@ -786,6 +830,7 @@ function toggleCraftingMenu() {
     menu.style.display = isVisible ? 'none' : 'block';
 
     if (!isVisible) {
+        gameState.selectedCraftIndex = 0;
         updateCraftingDisplay();
     }
 }
@@ -802,6 +847,7 @@ function toggleBuildMenu() {
     menu.style.display = isVisible ? 'none' : 'block';
 
     if (!isVisible) {
+        gameState.selectedBuildIndex = 0;
         updateBuildingDisplay();
     }
 }
@@ -810,13 +856,16 @@ function updateBuildingDisplay() {
     const container = document.getElementById('building-options');
     container.innerHTML = '';
 
-    for (const [id, building] of Object.entries(BUILDINGS)) {
+    const buildingEntries = Object.entries(BUILDINGS);
+    
+    buildingEntries.forEach(([id, building], index) => {
         const canBuild = Object.entries(building.requires).every(
             ([item, amount]) => (gameState.inventory[item] || 0) >= amount
         );
 
         const buildDiv = document.createElement('div');
-        buildDiv.className = `recipe-item ${canBuild ? '' : 'disabled'}`;
+        const isSelected = index === gameState.selectedBuildIndex;
+        buildDiv.className = `recipe-item ${canBuild ? '' : 'disabled'} ${isSelected ? 'selected' : ''}`;
         
         const requirements = Object.entries(building.requires)
             .map(([item, amount]) => {
@@ -833,11 +882,14 @@ function updateBuildingDisplay() {
         `;
 
         if (canBuild) {
-            buildDiv.addEventListener('click', () => enterBuildMode(id, building));
+            buildDiv.addEventListener('click', () => {
+                gameState.selectedBuildIndex = index;
+                enterBuildMode(id, building);
+            });
         }
 
         container.appendChild(buildDiv);
-    }
+    });
 }
 
 function enterBuildMode(buildingType, building) {
@@ -988,13 +1040,16 @@ function updateCraftingDisplay() {
     const container = document.getElementById('crafting-recipes');
     container.innerHTML = '';
 
-    for (const [id, recipe] of Object.entries(RECIPES)) {
+    const recipeEntries = Object.entries(RECIPES);
+    
+    recipeEntries.forEach(([id, recipe], index) => {
         const canCraft = Object.entries(recipe.requires).every(
             ([item, amount]) => (gameState.inventory[item] || 0) >= amount
         );
 
         const recipeDiv = document.createElement('div');
-        recipeDiv.className = `recipe-item ${canCraft ? '' : 'disabled'}`;
+        const isSelected = index === gameState.selectedCraftIndex;
+        recipeDiv.className = `recipe-item ${canCraft ? '' : 'disabled'} ${isSelected ? 'selected' : ''}`;
         
         const requirements = Object.entries(recipe.requires)
             .map(([item, amount]) => {
@@ -1011,11 +1066,14 @@ function updateCraftingDisplay() {
         `;
 
         if (canCraft) {
-            recipeDiv.addEventListener('click', () => craftItem(id, recipe));
+            recipeDiv.addEventListener('click', () => {
+                gameState.selectedCraftIndex = index;
+                craftItem(id, recipe);
+            });
         }
 
         container.appendChild(recipeDiv);
-    }
+    });
 }
 
 function craftItem(id, recipe) {
