@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Survival Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Game UI -->
+    <div id="ui-container">
+        <!-- Stats Panel -->
+        <div id="stats-panel">
+            <div class="stat-bar">
+                <span class="stat-label">Health</span>
+                <div class="bar-container">
+                    <div id="health-bar" class="bar health"></div>
+                </div>
+                <span id="health-value" class="stat-value">100</span>
+            </div>
+            <div class="stat-bar">
+                <span class="stat-label">Hunger</span>
+                <div class="bar-container">
+                    <div id="hunger-bar" class="bar hunger"></div>
+                </div>
+                <span id="hunger-value" class="stat-value">100</span>
+            </div>
+            <div class="stat-bar">
+                <span class="stat-label">Thirst</span>
+                <div class="bar-container">
+                    <div id="thirst-bar" class="bar thirst"></div>
+                </div>
+                <span id="thirst-value" class="stat-value">100</span>
+            </div>
+        </div>
+
+        <!-- Time Display -->
+        <div id="time-display">
+            <span id="time-text">Day 1 - 06:00</span>
+        </div>
+
+        <!-- Inventory -->
+        <div id="inventory">
+            <h3>Inventory</h3>
+            <div id="inventory-items"></div>
+        </div>
+
+        <!-- Crafting Menu -->
+        <div id="crafting-menu" style="display: none;">
+            <h3>Crafting</h3>
+            <div id="crafting-recipes"></div>
+            <button id="close-crafting">Close</button>
+        </div>
+
+        <!-- Messages -->
+        <div id="message-display"></div>
+
+        <!-- Controls Help -->
+        <div id="controls-help">
+            <h4>Controls:</h4>
+            <p>WASD - Move | Mouse - Look | E - Interact | C - Craft | Space - Jump</p>
+        </div>
+    </div>
+
+    <!-- Click to Start -->
+    <div id="start-screen">
+        <h1>3D Survival Game</h1>
+        <p>Click to start</p>
+        <div class="instructions">
+            <h3>How to Play:</h3>
+            <ul>
+                <li>Gather resources by clicking on trees and rocks (press E)</li>
+                <li>Keep your survival stats above 0</li>
+                <li>Craft items to help you survive</li>
+                <li>Survive as long as you can!</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
