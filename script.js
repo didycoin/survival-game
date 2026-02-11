@@ -455,15 +455,15 @@ function updateCamera() {
 
     // Movement direction based on where you're facing (yaw only, not pitch)
     const forward = new THREE.Vector3(
-        Math.sin(yaw),
+        -Math.sin(yaw),
         0,
-        Math.cos(yaw)
+        -Math.cos(yaw)
     );
     
     const right = new THREE.Vector3(
-        Math.sin(yaw + Math.PI / 2),
+        -Math.sin(yaw - Math.PI / 2),
         0,
-        Math.cos(yaw + Math.PI / 2)
+        -Math.cos(yaw - Math.PI / 2)
     );
 
     const moveVector = new THREE.Vector3();
