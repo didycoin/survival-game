@@ -221,15 +221,26 @@ body {
     border-radius: 5px;
     cursor: pointer;
     transition: background 0.2s;
+    border: 2px solid transparent;
 }
 
 .recipe-item:hover {
     background: rgba(255, 255, 255, 0.2);
 }
 
+.recipe-item.selected {
+    background: rgba(100, 150, 255, 0.3);
+    border: 2px solid rgba(100, 150, 255, 0.8);
+}
+
 .recipe-item.disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.recipe-item.disabled.selected {
+    background: rgba(150, 150, 150, 0.2);
+    border: 2px solid rgba(150, 150, 150, 0.5);
 }
 
 .recipe-name {
