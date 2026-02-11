@@ -186,7 +186,7 @@ function init() {
     // Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87CEEB);
-    scene.fog = new THREE.Fog(0x87CEEB, 50, CONFIG.FAR * 0.8);
+    scene.fog = new THREE.Fog(0x87CEEB, 100, 300); // Increased fog distance
 
     // Camera
     camera = new THREE.PerspectiveCamera(
@@ -198,10 +198,16 @@ function init() {
     camera.position.set(0, 2, 5);
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        powerPreference: "high-performance"
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Better quality on high-DPI screens
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; // Better colors
+    renderer.toneMappingExposure = 1.0;
     document.body.appendChild(renderer.domElement);
 
     // Raycaster for interactions
@@ -222,26 +228,34 @@ function init() {
 }
 
 function createLighting() {
-    // Ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    // Ambient light - softer
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(ambientLight);
 
-    // Directional light (sun)
-    const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    sunLight.position.set(50, 50, 50);
+    // Directional light (sun) - stronger and better positioned
+    const sunLight = new THREE.DirectionalLight(0xfff4e6, 1.2);
+    sunLight.position.set(50, 60, 30);
     sunLight.castShadow = true;
-    sunLight.shadow.camera.left = -50;
-    sunLight.shadow.camera.right = 50;
-    sunLight.shadow.camera.top = 50;
-    sunLight.shadow.camera.bottom = -50;
+    
+    // Better shadow quality
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
+    sunLight.shadow.camera.left = -100;
+    sunLight.shadow.camera.right = 100;
+    sunLight.shadow.camera.top = 100;
+    sunLight.shadow.camera.bottom = -100;
     sunLight.shadow.camera.near = 0.1;
-    sunLight.shadow.camera.far = 200;
-    sunLight.shadow.mapSize.width = 2048;
-    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.far = 300;
+    sunLight.shadow.bias = -0.0001;
     scene.add(sunLight);
+    
+    // Add hemisphere light for more natural lighting
+    const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x5a4a3a, 0.4);
+    scene.add(hemisphereLight);
     
     gameState.sunLight = sunLight;
     gameState.ambientLight = ambientLight;
+    gameState.hemisphereLight = hemisphereLight;
 }
 
 function createTerrain() {
@@ -290,8 +304,10 @@ function generateChunk(chunkX, chunkZ) {
     groundGeometry.computeVertexNormals();
 
     const groundMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x228B22,
-        roughness: 0.8
+        color: 0x3a5f3a, // Richer green
+        roughness: 0.9,
+        metalness: 0.0,
+        flatShading: false
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
@@ -394,21 +410,38 @@ function updateChunks() {
 function createTree(x, z) {
     const tree = new THREE.Group();
 
-    // Trunk
+    // Trunk - more realistic brown
     const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
-    const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const trunkMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x4a3426,
+        roughness: 0.9,
+        metalness: 0.0
+    });
     const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
     trunk.position.y = 1.5;
     trunk.castShadow = true;
+    trunk.receiveShadow = true;
     tree.add(trunk);
 
-    // Foliage
+    // Foliage - deeper green with multiple layers
     const foliageGeometry = new THREE.SphereGeometry(1.5, 8, 8);
-    const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x228B22 });
+    const foliageMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x1a5f1a,
+        roughness: 0.8,
+        metalness: 0.0
+    });
     const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
     foliage.position.y = 3.5;
     foliage.castShadow = true;
+    foliage.receiveShadow = true;
     tree.add(foliage);
+    
+    // Second foliage layer for depth
+    const foliage2 = new THREE.Mesh(foliageGeometry, foliageMaterial);
+    foliage2.position.y = 4.2;
+    foliage2.scale.set(0.7, 0.7, 0.7);
+    foliage2.castShadow = true;
+    tree.add(foliage2);
 
     tree.position.set(x, 0, z);
     tree.userData = { type: 'tree', resource: 'wood', amount: 3 };
@@ -422,13 +455,15 @@ function createTree(x, z) {
 function createRock(x, z) {
     const rockGeometry = new THREE.DodecahedronGeometry(0.8, 0);
     const rockMaterial = new THREE.MeshStandardMaterial({ 
-        color: 0x808080,
-        roughness: 0.9
+        color: 0x6b6b6b,
+        roughness: 0.95,
+        metalness: 0.1
     });
     const rock = new THREE.Mesh(rockGeometry, rockMaterial);
     rock.position.set(x, 0.4, z);
     rock.rotation.set(Math.random(), Math.random(), Math.random());
     rock.castShadow = true;
+    rock.receiveShadow = true;
     rock.userData = { type: 'rock', resource: 'stone', amount: 2 };
     
     scene.add(rock);
@@ -440,25 +475,34 @@ function createRock(x, z) {
 function createBerryBush(x, z) {
     const bush = new THREE.Group();
     
-    // Bush body
+    // Bush body - darker green
     const bushGeometry = new THREE.SphereGeometry(0.6, 8, 8);
-    const bushMaterial = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
+    const bushMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x1f3d0f,
+        roughness: 0.9
+    });
     const bushMesh = new THREE.Mesh(bushGeometry, bushMaterial);
     bushMesh.position.y = 0.6;
     bushMesh.scale.set(1, 0.8, 1);
     bushMesh.castShadow = true;
+    bushMesh.receiveShadow = true;
     bush.add(bushMesh);
     
-    // Berries (small red spheres)
+    // Berries - shinier red spheres
     for (let i = 0; i < 5; i++) {
         const berryGeometry = new THREE.SphereGeometry(0.08, 6, 6);
-        const berryMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+        const berryMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0xcc0000,
+            roughness: 0.3,
+            metalness: 0.1
+        });
         const berry = new THREE.Mesh(berryGeometry, berryMaterial);
         berry.position.set(
             (Math.random() - 0.5) * 0.8,
             0.6 + (Math.random() - 0.5) * 0.6,
             (Math.random() - 0.5) * 0.8
         );
+        berry.castShadow = true;
         bush.add(berry);
     }
     
@@ -474,12 +518,16 @@ function createBerryBush(x, z) {
 function createAnimal(x, z) {
     const animal = new THREE.Group();
     
-    // Body
+    // Body - more realistic brown
     const bodyGeometry = new THREE.BoxGeometry(0.8, 0.5, 1.2);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const bodyMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x6b4423,
+        roughness: 0.8
+    });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.position.y = 0.5;
     body.castShadow = true;
+    body.receiveShadow = true;
     animal.add(body);
     
     // Head
@@ -487,6 +535,7 @@ function createAnimal(x, z) {
     const head = new THREE.Mesh(headGeometry, bodyMaterial);
     head.position.set(0, 0.5, 0.9);
     head.castShadow = true;
+    head.receiveShadow = true;
     animal.add(head);
     
     // Legs
@@ -572,7 +621,20 @@ function setupEventListeners() {
         }
         
         if (e.key.toLowerCase() === 'c') {
-            toggleCraftingMenu();
+            // Close build menu if it's open
+            const buildMenu = document.getElementById('build-menu');
+            if (buildMenu.style.display !== 'none') {
+                buildMenu.style.display = 'none';
+                if (gameState.buildMode) {
+                    gameState.buildMode = false;
+                    if (gameState.buildingPreview) {
+                        scene.remove(gameState.buildingPreview);
+                        gameState.buildingPreview = null;
+                    }
+                }
+            } else {
+                toggleCraftingMenu();
+            }
         }
         
         if (e.key.toLowerCase() === 'b') {
@@ -1174,21 +1236,48 @@ function updateDayNight() {
     // Update sun position and color
     const sunAngle = gameState.time * Math.PI * 2;
     const sunX = Math.cos(sunAngle) * 50;
-    const sunY = Math.sin(sunAngle) * 50;
-    gameState.sunLight.position.set(sunX, Math.abs(sunY), 50);
+    const sunY = Math.sin(sunAngle) * 60;
+    gameState.sunLight.position.set(sunX, Math.abs(sunY), 30);
 
-    // Update lighting based on time
-    const dayIntensity = Math.max(0.2, Math.sin(sunAngle));
-    gameState.sunLight.intensity = dayIntensity * 0.8;
-    gameState.ambientLight.intensity = dayIntensity * 0.4;
+    // Update lighting based on time with smooth transitions
+    const dayIntensity = Math.max(0.1, Math.sin(sunAngle));
+    gameState.sunLight.intensity = dayIntensity * 1.2;
+    gameState.ambientLight.intensity = dayIntensity * 0.3;
+    
+    // Update hemisphere light
+    if (gameState.hemisphereLight) {
+        gameState.hemisphereLight.intensity = dayIntensity * 0.4;
+    }
 
-    // Update sky color
-    if (sunY > 0) {
-        scene.background.setHex(0x87CEEB); // Day
+    // Update sky and fog color based on time of day
+    if (sunY > 10) {
+        // Daytime - bright blue
+        const skyColor = new THREE.Color(0x87CEEB);
+        scene.background = skyColor;
+        scene.fog.color = skyColor;
+        gameState.sunLight.color.setHex(0xfff4e6);
+    } else if (sunY > 0) {
+        // Sunrise/sunset - orange/pink
+        const sunsetProgress = sunY / 10;
+        const skyColor = new THREE.Color().lerpColors(
+            new THREE.Color(0xff7e5f),
+            new THREE.Color(0x87CEEB),
+            sunsetProgress
+        );
+        scene.background = skyColor;
+        scene.fog.color = skyColor;
+        gameState.sunLight.color.setHex(0xffaa77);
     } else {
-        const nightness = Math.abs(sunY) / 50;
-        const skyColor = Math.floor((1 - nightness) * 0x87CEEB);
-        scene.background.setHex(Math.max(0x000022, skyColor));
+        // Night - dark blue
+        const nightness = Math.abs(sunY) / 60;
+        const skyColor = new THREE.Color().lerpColors(
+            new THREE.Color(0x1a2332),
+            new THREE.Color(0xff7e5f),
+            Math.max(0, 1 - nightness)
+        );
+        scene.background = skyColor;
+        scene.fog.color = skyColor;
+        gameState.sunLight.color.setHex(0x4466aa);
     }
 
     // Update time display
