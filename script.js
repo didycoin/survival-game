@@ -9,6 +9,8 @@ const CONFIG = {
     MOUSE_SENSITIVITY: 0.002,
     INTERACTION_DISTANCE: 5,
     TERRAIN_SIZE: 100,
+    CHUNK_SIZE: 50, // Size of each terrain chunk
+    RENDER_DISTANCE: 3, // How many chunks to render around player
     TREE_COUNT: 50,
     ROCK_COUNT: 30,
     SEED: Math.random() * 10000 // Random seed for map generation
@@ -25,11 +27,24 @@ const gameState = {
     isJumping: false,
     velocity: new THREE.Vector3(),
     canInteract: false,
-    nearestObject: null
+    nearestObject: null,
+    buildMode: false,
+    buildingPreview: null,
+    buildingType: null,
+    placedBuildings: [],
+    chunks: {}, // For terrain generation
+    lastChunkX: 0,
+    lastChunkZ: 0
 };
 
 // Crafting Recipes
 const RECIPES = {
+    buildingplan: {
+        name: 'Building Plan',
+        requires: { wood: 5 },
+        gives: { buildingplan: 1 },
+        description: 'Required to build structures'
+    },
     campfire: {
         name: 'Campfire',
         requires: { wood: 5, stone: 3 },
@@ -104,6 +119,46 @@ const RECIPES = {
     }
 };
 
+// Building structures (require building plan)
+const BUILDINGS = {
+    foundation: {
+        name: 'Foundation',
+        requires: { wood: 10, buildingplan: 1 },
+        returnsPlan: true,
+        description: 'Base for structures'
+    },
+    wall: {
+        name: 'Wall',
+        requires: { wood: 8, buildingplan: 1 },
+        returnsPlan: true,
+        description: 'Wooden wall'
+    },
+    doorway: {
+        name: 'Doorway',
+        requires: { wood: 6, buildingplan: 1 },
+        returnsPlan: true,
+        description: 'Wall with door opening'
+    },
+    floor: {
+        name: 'Floor',
+        requires: { wood: 8, buildingplan: 1 },
+        returnsPlan: true,
+        description: 'Floor piece'
+    },
+    stairs: {
+        name: 'Stairs',
+        requires: { wood: 12, buildingplan: 1 },
+        returnsPlan: true,
+        description: 'Wooden stairs'
+    },
+    roof: {
+        name: 'Roof',
+        requires: { wood: 6, buildingplan: 1 },
+        returnsPlan: true,
+        description: 'Slanted roof piece'
+    }
+};
+
 // Three.js Setup
 let scene, camera, renderer;
 let controls = {};
@@ -154,11 +209,8 @@ function init() {
     // Lighting
     createLighting();
 
-    // Terrain
+    // Terrain chunks (infinite generation)
     createTerrain();
-
-    // Environment
-    createEnvironment();
 
     // Event Listeners
     setupEventListeners();
@@ -191,13 +243,36 @@ function createLighting() {
 }
 
 function createTerrain() {
-    // Ground with varied height based on seed
-    const groundGeometry = new THREE.PlaneGeometry(CONFIG.TERRAIN_SIZE, CONFIG.TERRAIN_SIZE, 50, 50);
+    // Initial chunks around spawn
+    for (let x = -1; x <= 1; x++) {
+        for (let z = -1; z <= 1; z++) {
+            generateChunk(x, z);
+        }
+    }
+}
+
+function generateChunk(chunkX, chunkZ) {
+    const chunkKey = `${chunkX},${chunkZ}`;
     
-    // Add procedural height variation using seeded random
+    // Don't generate if already exists
+    if (gameState.chunks[chunkKey]) return;
+    
+    const chunk = {
+        x: chunkX,
+        z: chunkZ,
+        objects: []
+    };
+    
+    // Ground
+    const groundGeometry = new THREE.PlaneGeometry(CONFIG.CHUNK_SIZE, CONFIG.CHUNK_SIZE, 20, 20);
+    
+    // Add procedural height variation using chunk-specific seed
+    const chunkSeed = CONFIG.SEED + chunkX * 1000 + chunkZ;
+    const chunkRandom = new SeededRandom(chunkSeed);
+    
     const vertices = groundGeometry.attributes.position.array;
     for (let i = 0; i < vertices.length; i += 3) {
-        vertices[i + 2] = seededRandom.random() * 1.5 - 0.3;
+        vertices[i + 2] = chunkRandom.random() * 1.5 - 0.3;
     }
     groundGeometry.attributes.position.needsUpdate = true;
     groundGeometry.computeVertexNormals();
@@ -208,41 +283,93 @@ function createTerrain() {
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
+    ground.position.x = chunkX * CONFIG.CHUNK_SIZE;
+    ground.position.z = chunkZ * CONFIG.CHUNK_SIZE;
     ground.receiveShadow = true;
+    
     scene.add(ground);
+    chunk.objects.push(ground);
+    
+    // Add trees to chunk
+    const treesPerChunk = Math.floor(CONFIG.TREE_COUNT / 9); // Distribute trees
+    for (let i = 0; i < treesPerChunk; i++) {
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const tree = createTree(x, z);
+        chunk.objects.push(tree);
+    }
+    
+    // Add rocks to chunk
+    const rocksPerChunk = Math.floor(CONFIG.ROCK_COUNT / 9);
+    for (let i = 0; i < rocksPerChunk; i++) {
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const rock = createRock(x, z);
+        chunk.objects.push(rock);
+    }
+    
+    // Add berry bushes
+    const bushesPerChunk = 3;
+    for (let i = 0; i < bushesPerChunk; i++) {
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const bush = createBerryBush(x, z);
+        chunk.objects.push(bush);
+    }
+    
+    // Add animals
+    const animalsPerChunk = 2;
+    for (let i = 0; i < animalsPerChunk; i++) {
+        const x = chunkX * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const z = chunkZ * CONFIG.CHUNK_SIZE + (chunkRandom.random() - 0.5) * CONFIG.CHUNK_SIZE * 0.9;
+        const animal = createAnimal(x, z);
+        chunk.objects.push(animal);
+    }
+    
+    gameState.chunks[chunkKey] = chunk;
 }
 
-function createEnvironment() {
-    // Trees - using seeded random for consistent placement
-    for (let i = 0; i < CONFIG.TREE_COUNT; i++) {
-        createTree(
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9,
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9
-        );
-    }
-
-    // Rocks - using seeded random
-    for (let i = 0; i < CONFIG.ROCK_COUNT; i++) {
-        createRock(
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9,
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9
-        );
-    }
+function updateChunks() {
+    // Get player's chunk position
+    const playerChunkX = Math.floor(camera.position.x / CONFIG.CHUNK_SIZE);
+    const playerChunkZ = Math.floor(camera.position.z / CONFIG.CHUNK_SIZE);
     
-    // Add some berry bushes
-    for (let i = 0; i < 15; i++) {
-        createBerryBush(
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9,
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9
-        );
-    }
-    
-    // Add animals for hunting
-    for (let i = 0; i < 10; i++) {
-        createAnimal(
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9,
-            (seededRandom.random() - 0.5) * CONFIG.TERRAIN_SIZE * 0.9
-        );
+    // Only update if player moved to new chunk
+    if (playerChunkX !== gameState.lastChunkX || playerChunkZ !== gameState.lastChunkZ) {
+        gameState.lastChunkX = playerChunkX;
+        gameState.lastChunkZ = playerChunkZ;
+        
+        // Generate chunks around player
+        for (let x = -CONFIG.RENDER_DISTANCE; x <= CONFIG.RENDER_DISTANCE; x++) {
+            for (let z = -CONFIG.RENDER_DISTANCE; z <= CONFIG.RENDER_DISTANCE; z++) {
+                generateChunk(playerChunkX + x, playerChunkZ + z);
+            }
+        }
+        
+        // Remove far chunks to save memory
+        const chunksToRemove = [];
+        for (const chunkKey in gameState.chunks) {
+            const [chunkX, chunkZ] = chunkKey.split(',').map(Number);
+            const distX = Math.abs(chunkX - playerChunkX);
+            const distZ = Math.abs(chunkZ - playerChunkZ);
+            
+            if (distX > CONFIG.RENDER_DISTANCE + 1 || distZ > CONFIG.RENDER_DISTANCE + 1) {
+                chunksToRemove.push(chunkKey);
+            }
+        }
+        
+        // Remove chunks
+        for (const chunkKey of chunksToRemove) {
+            const chunk = gameState.chunks[chunkKey];
+            for (const obj of chunk.objects) {
+                scene.remove(obj);
+                const index = interactableObjects.indexOf(obj);
+                if (index > -1) {
+                    interactableObjects.splice(index, 1);
+                }
+            }
+            delete gameState.chunks[chunkKey];
+        }
     }
 }
 
@@ -270,6 +397,8 @@ function createTree(x, z) {
     
     scene.add(tree);
     interactableObjects.push(tree);
+    
+    return tree;
 }
 
 function createRock(x, z) {
@@ -286,6 +415,8 @@ function createRock(x, z) {
     
     scene.add(rock);
     interactableObjects.push(rock);
+    
+    return rock;
 }
 
 function createBerryBush(x, z) {
@@ -318,6 +449,8 @@ function createBerryBush(x, z) {
     
     scene.add(bush);
     interactableObjects.push(bush);
+    
+    return bush;
 }
 
 function createAnimal(x, z) {
@@ -360,6 +493,8 @@ function createAnimal(x, z) {
     
     scene.add(animal);
     interactableObjects.push(animal);
+    
+    return animal;
 }
 
 function setupEventListeners() {
@@ -373,6 +508,24 @@ function setupEventListeners() {
         
         if (e.key.toLowerCase() === 'c') {
             toggleCraftingMenu();
+        }
+        
+        if (e.key.toLowerCase() === 'b') {
+            if (gameState.buildMode) {
+                // Exit build mode
+                gameState.buildMode = false;
+                if (gameState.buildingPreview) {
+                    scene.remove(gameState.buildingPreview);
+                    gameState.buildingPreview = null;
+                }
+                showMessage('Build mode cancelled');
+            } else {
+                toggleBuildMenu();
+            }
+        }
+        
+        if (e.key.toLowerCase() === 'q' && gameState.buildMode) {
+            rotateBuildingPreview();
         }
         
         if (e.key === ' ' && !gameState.isJumping) {
@@ -390,6 +543,13 @@ function setupEventListeners() {
         controls[e.key.toLowerCase()] = false;
     });
 
+    // Mouse click for building
+    document.addEventListener('click', () => {
+        if (gameState.buildMode && gameState.buildingPreview) {
+            placeBuilding();
+        }
+    });
+
     // Mouse movement
     document.addEventListener('mousemove', onMouseMove);
 
@@ -399,6 +559,19 @@ function setupEventListeners() {
     // Crafting menu
     document.getElementById('close-crafting').addEventListener('click', () => {
         document.getElementById('crafting-menu').style.display = 'none';
+    });
+    
+    // Build menu
+    document.getElementById('close-build').addEventListener('click', () => {
+        document.getElementById('build-menu').style.display = 'none';
+        // Exit build mode
+        if (gameState.buildMode) {
+            gameState.buildMode = false;
+            if (gameState.buildingPreview) {
+                scene.remove(gameState.buildingPreview);
+                gameState.buildingPreview = null;
+            }
+        }
     });
 }
 
@@ -617,6 +790,200 @@ function toggleCraftingMenu() {
     }
 }
 
+function toggleBuildMenu() {
+    // Check if player has building plan
+    if (!gameState.inventory['buildingplan'] || gameState.inventory['buildingplan'] < 1) {
+        showMessage('You need a Building Plan to build! (Craft one first)');
+        return;
+    }
+    
+    const menu = document.getElementById('build-menu');
+    const isVisible = menu.style.display !== 'none';
+    menu.style.display = isVisible ? 'none' : 'block';
+
+    if (!isVisible) {
+        updateBuildingDisplay();
+    }
+}
+
+function updateBuildingDisplay() {
+    const container = document.getElementById('building-options');
+    container.innerHTML = '';
+
+    for (const [id, building] of Object.entries(BUILDINGS)) {
+        const canBuild = Object.entries(building.requires).every(
+            ([item, amount]) => (gameState.inventory[item] || 0) >= amount
+        );
+
+        const buildDiv = document.createElement('div');
+        buildDiv.className = `recipe-item ${canBuild ? '' : 'disabled'}`;
+        
+        const requirements = Object.entries(building.requires)
+            .map(([item, amount]) => {
+                const has = gameState.inventory[item] || 0;
+                const color = has >= amount ? '#4CAF50' : '#f44336';
+                return `<span style="color: ${color}">${item}: ${has}/${amount}</span>`;
+            })
+            .join(', ');
+
+        buildDiv.innerHTML = `
+            <div class="recipe-name">${building.name}</div>
+            <div class="recipe-requirements">Requires: ${requirements}</div>
+            <div class="recipe-requirements" style="margin-top: 5px; font-style: italic;">${building.description}</div>
+        `;
+
+        if (canBuild) {
+            buildDiv.addEventListener('click', () => enterBuildMode(id, building));
+        }
+
+        container.appendChild(buildDiv);
+    }
+}
+
+function enterBuildMode(buildingType, building) {
+    gameState.buildMode = true;
+    gameState.buildingType = buildingType;
+    
+    // Close build menu
+    document.getElementById('build-menu').style.display = 'none';
+    
+    // Create preview
+    createBuildingPreview(buildingType);
+    
+    showMessage(`Build Mode: ${building.name} (Click to place, Q to rotate, B to cancel)`);
+}
+
+function createBuildingPreview(type) {
+    // Remove old preview if exists
+    if (gameState.buildingPreview) {
+        scene.remove(gameState.buildingPreview);
+    }
+    
+    const preview = new THREE.Group();
+    const material = new THREE.MeshBasicMaterial({ 
+        color: 0x00ff00, 
+        transparent: true, 
+        opacity: 0.5,
+        wireframe: false
+    });
+    
+    let geometry;
+    
+    switch(type) {
+        case 'foundation':
+            geometry = new THREE.BoxGeometry(4, 0.2, 4);
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.y = 0.1;
+            preview.add(mesh);
+            break;
+            
+        case 'wall':
+            geometry = new THREE.BoxGeometry(4, 3, 0.2);
+            const wallMesh = new THREE.Mesh(geometry, material);
+            wallMesh.position.y = 1.5;
+            preview.add(wallMesh);
+            break;
+            
+        case 'doorway':
+            const doorwayGroup = new THREE.Group();
+            // Left wall part
+            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 0.2), material);
+            leftWall.position.set(-1.25, 1.5, 0);
+            doorwayGroup.add(leftWall);
+            // Right wall part
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 0.2), material);
+            rightWall.position.set(1.25, 1.5, 0);
+            doorwayGroup.add(rightWall);
+            // Top part
+            const topWall = new THREE.Mesh(new THREE.BoxGeometry(4, 1, 0.2), material);
+            topWall.position.set(0, 2.5, 0);
+            doorwayGroup.add(topWall);
+            preview.add(doorwayGroup);
+            break;
+            
+        case 'floor':
+            geometry = new THREE.BoxGeometry(4, 0.2, 4);
+            const floorMesh = new THREE.Mesh(geometry, material);
+            floorMesh.position.y = 0.1;
+            preview.add(floorMesh);
+            break;
+            
+        case 'stairs':
+            for (let i = 0; i < 4; i++) {
+                const step = new THREE.Mesh(
+                    new THREE.BoxGeometry(4, 0.5, 1),
+                    material
+                );
+                step.position.set(0, i * 0.5 + 0.25, i * 1 - 1.5);
+                preview.add(step);
+            }
+            break;
+            
+        case 'roof':
+            const roofGeom = new THREE.BoxGeometry(4, 0.2, 4.5);
+            const roofMesh = new THREE.Mesh(roofGeom, material);
+            roofMesh.rotation.x = Math.PI / 4;
+            roofMesh.position.y = 2;
+            preview.add(roofMesh);
+            break;
+    }
+    
+    preview.userData = { isPreview: true, type: type };
+    gameState.buildingPreview = preview;
+    scene.add(preview);
+}
+
+function rotateBuildingPreview() {
+    if (gameState.buildingPreview) {
+        gameState.buildingPreview.rotation.y += Math.PI / 2;
+    }
+}
+
+function placeBuilding() {
+    if (!gameState.buildingPreview) return;
+    
+    const building = BUILDINGS[gameState.buildingType];
+    
+    // Check materials
+    const canBuild = Object.entries(building.requires).every(
+        ([item, amount]) => (gameState.inventory[item] || 0) >= amount
+    );
+    
+    if (!canBuild) {
+        showMessage('Not enough materials!');
+        return;
+    }
+    
+    // Remove materials
+    for (const [item, amount] of Object.entries(building.requires)) {
+        gameState.inventory[item] -= amount;
+        
+        // Return building plan if specified
+        if (item === 'buildingplan' && building.returnsPlan) {
+            gameState.inventory[item] += 1;
+        }
+    }
+    
+    // Create permanent building
+    const permanentBuilding = gameState.buildingPreview.clone();
+    permanentBuilding.traverse((child) => {
+        if (child.isMesh) {
+            child.material = child.material.clone();
+            child.material.opacity = 1;
+            child.material.transparent = false;
+            child.material.color.setHex(0x8B4513); // Wood color
+        }
+    });
+    
+    scene.add(permanentBuilding);
+    gameState.placedBuildings.push(permanentBuilding);
+    
+    showMessage(`Built ${building.name}!`);
+    updateInventoryDisplay();
+    
+    // Don't exit build mode, let player keep building
+}
+
 function updateCraftingDisplay() {
     const container = document.getElementById('crafting-recipes');
     container.innerHTML = '';
@@ -767,8 +1134,49 @@ function animate() {
     updateCamera();
     checkInteraction();
     updateDayNight();
+    updateBuildingPreview();
+    updateChunks(); // Generate terrain as player moves
 
     renderer.render(scene, camera);
+}
+
+function updateBuildingPreview() {
+    if (gameState.buildMode && gameState.buildingPreview) {
+        // Position preview in front of player
+        const distance = 5;
+        const forward = new THREE.Vector3(
+            -Math.sin(yaw),
+            0,
+            -Math.cos(yaw)
+        );
+        
+        gameState.buildingPreview.position.set(
+            camera.position.x + forward.x * distance,
+            camera.position.y - 2, // At ground level
+            camera.position.z + forward.z * distance
+        );
+        
+        // Snap to grid
+        gameState.buildingPreview.position.x = Math.round(gameState.buildingPreview.position.x / 2) * 2;
+        gameState.buildingPreview.position.z = Math.round(gameState.buildingPreview.position.z / 2) * 2;
+        
+        // Check if can place (basic collision check)
+        let canPlace = true;
+        for (const building of gameState.placedBuildings) {
+            const distance = gameState.buildingPreview.position.distanceTo(building.position);
+            if (distance < 2) {
+                canPlace = false;
+                break;
+            }
+        }
+        
+        // Update preview color
+        gameState.buildingPreview.traverse((child) => {
+            if (child.isMesh) {
+                child.material.color.setHex(canPlace ? 0x00ff00 : 0xff0000);
+            }
+        });
+    }
 }
 
 // Initialize when page loads
