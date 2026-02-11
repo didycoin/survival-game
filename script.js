@@ -632,9 +632,9 @@ function setupEventListeners() {
                         gameState.buildingPreview = null;
                     }
                 }
-            } else {
-                toggleCraftingMenu();
             }
+            // Toggle crafting menu
+            toggleCraftingMenu();
         }
         
         if (e.key.toLowerCase() === 'b') {
