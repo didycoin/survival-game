@@ -403,6 +403,8 @@ function setupEventListeners() {
 }
 
 let mouseMovement = { x: 0, y: 0 };
+let pitch = 0; // Up/down rotation
+let yaw = 0;   // Left/right rotation
 
 function onMouseMove(event) {
     if (document.pointerLockElement === renderer.domElement) {
@@ -426,31 +428,47 @@ function startGame() {
 
 function updateCamera() {
     if (document.pointerLockElement === renderer.domElement) {
-        // Rotate camera with mouse (natural FPS controls)
-        camera.rotation.y -= mouseMovement.x * CONFIG.MOUSE_SENSITIVITY;
-        camera.rotation.x += mouseMovement.y * CONFIG.MOUSE_SENSITIVITY; // Fixed: inverted Y
-        camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+        // Update pitch and yaw based on mouse movement
+        yaw -= mouseMovement.x * CONFIG.MOUSE_SENSITIVITY;
+        pitch += mouseMovement.y * CONFIG.MOUSE_SENSITIVITY;
+        
+        // Clamp pitch to prevent flipping
+        pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitch));
+        
+        // Apply rotation using Euler angles in the correct order (YXZ)
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = yaw;
+        camera.rotation.x = pitch;
+        camera.rotation.z = 0; // Never roll the camera
         
         mouseMovement.x = 0;
         mouseMovement.y = 0;
     }
 
-    // Movement
+    // Movement - get direction from camera's rotation
     const direction = new THREE.Vector3();
     const right = new THREE.Vector3();
 
-    camera.getWorldDirection(direction);
-    direction.y = 0;
-    direction.normalize();
+    // Get forward direction (ignoring pitch for movement)
+    direction.set(
+        -Math.sin(yaw),
+        0,
+        -Math.cos(yaw)
+    ).normalize();
 
-    right.crossVectors(camera.up, direction).normalize();
+    // Get right direction
+    right.set(
+        Math.cos(yaw),
+        0,
+        -Math.sin(yaw)
+    ).normalize();
 
     const moveVector = new THREE.Vector3();
 
     if (controls['w']) moveVector.add(direction);
     if (controls['s']) moveVector.sub(direction);
-    if (controls['a']) moveVector.add(right);
-    if (controls['d']) moveVector.sub(right);
+    if (controls['d']) moveVector.add(right);
+    if (controls['a']) moveVector.sub(right);
 
     moveVector.normalize().multiplyScalar(CONFIG.MOVE_SPEED);
 
