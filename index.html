@@ -39,20 +39,19 @@
             <span id="time-text">Day 1 - 06:00</span>
         </div>
 
-        <!-- Inventory -->
-        <div id="inventory">
-            <h3>Inventory</h3>
-            <div id="inventory-items"></div>
-            <p style="margin-top: 10px; font-size: 0.85em; color: #aaa;">
-                Green = consumables (press 1-9) | Orange = equipment (click to equip)
-            </p>
-        </div>
-
-        <!-- Crafting Menu -->
-        <div id="crafting-menu" style="display: none;">
-            <h3>Crafting</h3>
-            <div id="crafting-recipes"></div>
-            <button id="close-crafting">Close</button>
+        <!-- Inventory Menu (Rust style - Tab key) -->
+        <div id="inventory-menu" style="display: none;">
+            <div class="inventory-container">
+                <div class="inventory-left">
+                    <h3>Inventory</h3>
+                    <div id="inventory-grid"></div>
+                </div>
+                <div class="inventory-right">
+                    <h3>Crafting</h3>
+                    <div id="crafting-recipes"></div>
+                </div>
+            </div>
+            <button id="close-inventory">Close (Tab)</button>
         </div>
 
         <!-- Build Menu -->
@@ -68,7 +67,7 @@
         <!-- Controls Help -->
         <div id="controls-help">
             <h4>Controls:</h4>
-            <p>WASD - Move | Mouse - Look | E - Interact | C - Craft | B - Build | Space - Jump | 1-9 - Use Items</p>
+            <p>WASD - Move | Mouse - Look | E - Interact | Tab - Inventory | B - Build | Space - Jump</p>
             <p style="font-size: 0.8em; margin-top: 5px;">Menus: ↑↓ arrows to select | Enter to craft/build</p>
             <p style="font-size: 0.8em; margin-top: 3px;">Build Mode: Click to place | Q - Rotate | B - Cancel</p>
         </div>
