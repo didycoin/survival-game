@@ -21,7 +21,7 @@ const gameState = {
     health: 100,
     hunger: 100,
     thirst: 100,
-    inventory: {},
+    inventory: { rock: 1 }, // Start with a rock
     time: 0, // 0 = midnight, 0.5 = noon, 1 = midnight
     day: 1,
     isJumping: false,
@@ -37,52 +37,47 @@ const gameState = {
     lastChunkZ: 0,
     selectedCraftIndex: 0,
     selectedBuildIndex: 0,
-    equippedItem: null // Currently equipped tool/weapon
+    equippedItem: 'rock', // Start with rock equipped
+    handModel: null // Visual hand/tool model
 };
 
 // Crafting Recipes
 const RECIPES = {
+    stoneaxe: {
+        name: 'Stone Axe',
+        requires: { wood: 5, rock: 3 },
+        gives: { stoneaxe: 1 },
+        description: 'Chop trees faster (+3 wood per tree)'
+    },
+    stonepickaxe: {
+        name: 'Stone Pickaxe',
+        requires: { wood: 3, rock: 5 },
+        gives: { stonepickaxe: 1 },
+        description: 'Mine rocks faster (+3 stone per rock)'
+    },
+    spear: {
+        name: 'Wooden Spear',
+        requires: { wood: 4, rock: 2 },
+        gives: { spear: 1 },
+        description: 'Hunt animals (+2 meat)'
+    },
+    torch: {
+        name: 'Torch',
+        requires: { wood: 2, rock: 1 },
+        gives: { torch: 1 },
+        description: 'Light source'
+    },
+    campfire: {
+        name: 'Campfire',
+        requires: { wood: 5, rock: 3 },
+        gives: { campfire: 1 },
+        description: 'Cook food and stay warm'
+    },
     buildingplan: {
         name: 'Building Plan',
         requires: { wood: 5 },
         gives: { buildingplan: 1 },
         description: 'Required to build structures'
-    },
-    campfire: {
-        name: 'Campfire',
-        requires: { wood: 5, stone: 3 },
-        gives: { campfire: 1 },
-        description: 'Provides warmth and light'
-    },
-    axe: {
-        name: 'Stone Axe',
-        requires: { wood: 3, stone: 5 },
-        gives: { axe: 1 },
-        description: 'Gather wood faster'
-    },
-    pickaxe: {
-        name: 'Stone Pickaxe',
-        requires: { wood: 2, stone: 6 },
-        gives: { pickaxe: 1 },
-        description: 'Gather stone faster'
-    },
-    shelter: {
-        name: 'Basic Shelter',
-        requires: { wood: 10, stone: 5 },
-        gives: { shelter: 1 },
-        description: 'A safe place to rest'
-    },
-    waterbottle: {
-        name: 'Water Bottle',
-        requires: { stone: 2 },
-        gives: { waterbottle: 1 },
-        description: 'Store water for later'
-    },
-    berries: {
-        name: 'Berry Bush',
-        requires: { wood: 3 },
-        gives: { berries: 5 },
-        description: 'Plant berries to harvest food'
     },
     cookedmeat: {
         name: 'Cook Meat',
@@ -90,35 +85,17 @@ const RECIPES = {
         gives: { cookedmeat: 1, campfire: 1 },
         description: 'Restores 30 hunger'
     },
-    torch: {
-        name: 'Torch',
-        requires: { wood: 2, stone: 1 },
-        gives: { torch: 3 },
-        description: 'Light up the night'
-    },
-    wall: {
-        name: 'Wooden Wall',
-        requires: { wood: 8 },
-        gives: { wall: 1 },
-        description: 'Build protective walls'
+    waterbottle: {
+        name: 'Water Bottle',
+        requires: { rock: 2 },
+        gives: { waterbottle: 1 },
+        description: 'Store water (+50 thirst)'
     },
     workbench: {
         name: 'Workbench',
-        requires: { wood: 15, stone: 10 },
+        requires: { wood: 15, rock: 10 },
         gives: { workbench: 1 },
         description: 'Unlock advanced crafting'
-    },
-    spear: {
-        name: 'Wooden Spear',
-        requires: { wood: 4, stone: 2 },
-        gives: { spear: 1 },
-        description: 'A basic weapon'
-    },
-    backpack: {
-        name: 'Backpack',
-        requires: { wood: 5, stone: 3 },
-        gives: { backpack: 1 },
-        description: 'Carry more items'
     }
 };
 
@@ -465,7 +442,7 @@ function createRock(x, z) {
     rock.rotation.set(Math.random(), Math.random(), Math.random());
     rock.castShadow = true;
     rock.receiveShadow = true;
-    rock.userData = { type: 'rock', resource: 'stone', amount: 2 };
+    rock.userData = { type: 'rock', resource: 'rock', amount: 2 };
     
     scene.add(rock);
     interactableObjects.push(rock);
@@ -571,22 +548,26 @@ function setupEventListeners() {
         controls[e.key.toLowerCase()] = true;
         
         // Menu navigation
-        const craftingMenu = document.getElementById('crafting-menu');
+        const inventoryMenu = document.getElementById('inventory-menu');
         const buildMenu = document.getElementById('build-menu');
-        const isCraftingOpen = craftingMenu.style.display !== 'none';
+        const isInventoryOpen = inventoryMenu.style.display !== 'none';
         const isBuildOpen = buildMenu.style.display !== 'none';
         
-        // Handle C and B keys FIRST - they should work whether menu is open or not
-        if (e.key.toLowerCase() === 'c') {
+        // Handle Tab for inventory (like Rust)
+        if (e.key === 'Tab') {
             e.preventDefault();
-            // Toggle crafting menu
-            if (isCraftingOpen) {
-                craftingMenu.style.display = 'none';
+            const inventoryMenu = document.getElementById('inventory-menu');
+            const isBuildOpen = buildMenu.style.display !== 'none';
+            
+            // Toggle inventory
+            if (inventoryMenu.style.display !== 'none') {
+                inventoryMenu.style.display = 'none';
             } else {
-                craftingMenu.style.display = 'block';
+                inventoryMenu.style.display = 'block';
                 gameState.selectedCraftIndex = 0;
                 updateCraftingDisplay();
             }
+            
             // Close build menu if open
             if (isBuildOpen) {
                 buildMenu.style.display = 'none';
@@ -631,13 +612,13 @@ function setupEventListeners() {
         }
         
         // Arrow key navigation only when a menu is actually open
-        if (isCraftingOpen || isBuildOpen) {
-            const recipes = isCraftingOpen ? Object.keys(RECIPES) : Object.keys(BUILDINGS);
+        if (isInventoryOpen || isBuildOpen) {
+            const recipes = isInventoryOpen ? Object.keys(RECIPES) : Object.keys(BUILDINGS);
             const maxIndex = recipes.length - 1;
             
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                if (isCraftingOpen) {
+                if (isInventoryOpen) {
                     gameState.selectedCraftIndex = Math.min(gameState.selectedCraftIndex + 1, maxIndex);
                     updateCraftingDisplay();
                     scrollToSelected('crafting-recipes');
@@ -648,7 +629,7 @@ function setupEventListeners() {
                 }
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                if (isCraftingOpen) {
+                if (isInventoryOpen) {
                     gameState.selectedCraftIndex = Math.max(gameState.selectedCraftIndex - 1, 0);
                     updateCraftingDisplay();
                     scrollToSelected('crafting-recipes');
@@ -659,7 +640,7 @@ function setupEventListeners() {
                 }
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                if (isCraftingOpen) {
+                if (isInventoryOpen) {
                     const recipeId = recipes[gameState.selectedCraftIndex];
                     const recipe = RECIPES[recipeId];
                     craftItem(recipeId, recipe);
@@ -725,6 +706,11 @@ function setupEventListeners() {
             }
         }
     });
+    
+    // Inventory menu
+    document.getElementById('close-inventory').addEventListener('click', () => {
+        document.getElementById('inventory-menu').style.display = 'none';
+    });
 }
 
 let mouseMovement = { x: 0, y: 0 };
@@ -752,8 +738,140 @@ function startGame() {
     pitch = 0;
     yaw = 0;
     
+    // Create initial hand model
+    createHandModel();
+    updateHandModel();
+    
     animate();
     updateSurvivalStats();
+}
+
+function createHandModel() {
+    // Remove old hand if exists
+    if (gameState.handModel) {
+        camera.remove(gameState.handModel);
+    }
+    
+    const handGroup = new THREE.Group();
+    
+    // Right hand (box shape)
+    const handGeometry = new THREE.BoxGeometry(0.15, 0.3, 0.08);
+    const handMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xd4a574,
+        roughness: 0.8
+    });
+    const rightHand = new THREE.Mesh(handGeometry, handMaterial);
+    rightHand.position.set(0.3, -0.2, -0.4);
+    handGroup.add(rightHand);
+    
+    // Left hand
+    const leftHand = new THREE.Mesh(handGeometry, handMaterial);
+    leftHand.position.set(-0.3, -0.2, -0.4);
+    handGroup.add(leftHand);
+    
+    gameState.handModel = handGroup;
+    camera.add(handGroup);
+}
+
+function updateHandModel() {
+    if (!gameState.handModel) return;
+    
+    // Remove old tool model
+    const oldTool = gameState.handModel.getObjectByName('tool');
+    if (oldTool) {
+        gameState.handModel.remove(oldTool);
+    }
+    
+    // Add tool model based on equipped item
+    if (gameState.equippedItem && gameState.equippedItem !== 'none') {
+        const toolGroup = new THREE.Group();
+        toolGroup.name = 'tool';
+        
+        switch(gameState.equippedItem) {
+            case 'rock':
+                const rockGeom = new THREE.DodecahedronGeometry(0.08, 0);
+                const rockMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b });
+                const rockMesh = new THREE.Mesh(rockGeom, rockMat);
+                rockMesh.position.set(0.35, -0.15, -0.35);
+                toolGroup.add(rockMesh);
+                break;
+                
+            case 'stoneaxe':
+                // Axe handle
+                const handleGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.4);
+                const handleMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const handle = new THREE.Mesh(handleGeom, handleMat);
+                handle.position.set(0.3, -0.1, -0.4);
+                handle.rotation.z = Math.PI / 4;
+                toolGroup.add(handle);
+                
+                // Axe head
+                const axeHeadGeom = new THREE.BoxGeometry(0.15, 0.08, 0.05);
+                const axeHeadMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b });
+                const axeHead = new THREE.Mesh(axeHeadGeom, axeHeadMat);
+                axeHead.position.set(0.45, 0.05, -0.4);
+                toolGroup.add(axeHead);
+                break;
+                
+            case 'stonepickaxe':
+                // Pickaxe handle
+                const pickHandleGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.4);
+                const pickHandleMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const pickHandle = new THREE.Mesh(pickHandleGeom, pickHandleMat);
+                pickHandle.position.set(0.3, -0.1, -0.4);
+                pickHandle.rotation.z = Math.PI / 4;
+                toolGroup.add(pickHandle);
+                
+                // Pick head
+                const pickHeadGeom = new THREE.BoxGeometry(0.2, 0.05, 0.05);
+                const pickHeadMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b });
+                const pickHead = new THREE.Mesh(pickHeadGeom, pickHeadMat);
+                pickHead.position.set(0.45, 0.05, -0.4);
+                toolGroup.add(pickHead);
+                break;
+                
+            case 'spear':
+                // Spear shaft
+                const spearShaftGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.6);
+                const spearShaftMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const spearShaft = new THREE.Mesh(spearShaftGeom, spearShaftMat);
+                spearShaft.position.set(0.3, -0.05, -0.5);
+                spearShaft.rotation.z = Math.PI / 6;
+                toolGroup.add(spearShaft);
+                
+                // Spear tip
+                const spearTipGeom = new THREE.ConeGeometry(0.04, 0.1, 4);
+                const spearTipMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b });
+                const spearTip = new THREE.Mesh(spearTipGeom, spearTipMat);
+                spearTip.position.set(0.5, 0.2, -0.5);
+                spearTip.rotation.z = -Math.PI / 2;
+                toolGroup.add(spearTip);
+                break;
+                
+            case 'torch':
+                // Torch handle
+                const torchHandleGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.3);
+                const torchHandleMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                const torchHandle = new THREE.Mesh(torchHandleGeom, torchHandleMat);
+                torchHandle.position.set(0.3, -0.1, -0.4);
+                torchHandle.rotation.z = Math.PI / 6;
+                toolGroup.add(torchHandle);
+                
+                // Torch flame
+                const flameGeom = new THREE.SphereGeometry(0.06, 8, 8);
+                const flameMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xff6600,
+                    emissive: 0xff6600,
+                    emissiveIntensity: 1
+                });
+                const flame = new THREE.Mesh(flameGeom, flameMat);
+                flame.position.set(0.38, 0.05, -0.4);
+                toolGroup.add(flame);
+                break;
+        }
+        
+        gameState.handModel.add(toolGroup);
+    }
 }
 
 function updateCamera() {
@@ -847,15 +965,18 @@ function interactWithObject(object) {
     let amount = object.userData.amount;
     
     // Equipped tools give bonus resources
-    if (gameState.equippedItem === 'axe' && object.userData.type === 'tree') {
-        amount += 2; // Axe gives +2 wood
-        showMessage(`Axe bonus! +${amount} ${resource}`);
-    } else if (gameState.equippedItem === 'pickaxe' && object.userData.type === 'rock') {
-        amount += 2; // Pickaxe gives +2 stone
-        showMessage(`Pickaxe bonus! +${amount} ${resource}`);
+    if (gameState.equippedItem === 'stoneaxe' && object.userData.type === 'tree') {
+        amount += 3; // Stone axe gives +3 wood
+        showMessage(`Stone Axe bonus! +${amount} ${resource}`);
+    } else if (gameState.equippedItem === 'stonepickaxe' && object.userData.type === 'rock') {
+        amount += 3; // Stone pickaxe gives +3 rock
+        showMessage(`Stone Pickaxe bonus! +${amount} ${resource}`);
     } else if (gameState.equippedItem === 'spear' && object.userData.type === 'animal') {
-        amount += 1; // Spear gives +1 meat
+        amount += 2; // Spear gives +2 meat
         showMessage(`Spear bonus! +${amount} ${resource}`);
+    } else if (gameState.equippedItem === 'rock') {
+        // Rock can gather everything but slowly
+        showMessage(`+${amount} ${resource}`);
     } else {
         showMessage(`+${amount} ${resource}`);
     }
@@ -880,12 +1001,13 @@ function interactWithObject(object) {
 }
 
 function updateInventoryDisplay() {
-    const container = document.getElementById('inventory-items');
+    const container = document.getElementById('inventory-grid');
+    if (!container) return;
+    
     container.innerHTML = '';
 
     const consumables = ['rawberries', 'cookedmeat', 'waterbottle'];
-    const equipables = ['axe', 'pickaxe', 'spear', 'torch'];
-    let slotNumber = 1;
+    const equipables = ['rock', 'stoneaxe', 'stonepickaxe', 'spear', 'torch'];
 
     for (const [item, count] of Object.entries(gameState.inventory)) {
         if (count > 0) {
@@ -900,12 +1022,11 @@ function updateInventoryDisplay() {
             if (isEquipable) itemDiv.classList.add('equipable');
             if (isConsumable) itemDiv.classList.add('consumable');
             
-            const slotDisplay = isConsumable ? `[${slotNumber}] ` : '';
-            const equippedDisplay = isEquipped ? ' ⚔ EQUIPPED' : '';
+            const equippedDisplay = isEquipped ? '⚔' : '';
             
             itemDiv.innerHTML = `
-                <span>${slotDisplay}${item}${equippedDisplay}</span>
-                <span class="item-count">${count}</span>
+                <div style="font-size: 1.1em; font-weight: bold;">${item} ${equippedDisplay}</div>
+                <div class="item-count">${count}</div>
             `;
             
             // Click to equip/unequip
@@ -918,13 +1039,10 @@ function updateInventoryDisplay() {
                     } else {
                         gameState.equippedItem = item;
                         showMessage(`Equipped ${item}`);
+                        updateHandModel();
                     }
                     updateInventoryDisplay();
                 });
-            }
-            
-            if (isConsumable) {
-                slotNumber++;
             }
             
             container.appendChild(itemDiv);
