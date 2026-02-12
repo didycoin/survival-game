@@ -597,9 +597,9 @@ function setupEventListeners() {
         
         if (e.key.toLowerCase() === 'b') {
             e.preventDefault();
-            // Close crafting menu if open
-            if (isCraftingOpen) {
-                craftingMenu.style.display = 'none';
+            // Close inventory menu if open
+            if (isInventoryOpen) {
+                inventoryMenu.style.display = 'none';
             }
             // Toggle build menu
             if (isBuildOpen) {
