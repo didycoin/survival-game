@@ -202,7 +202,14 @@ function init() {
     setupEventListeners();
 
     // Start Screen
-    document.getElementById('start-screen').addEventListener('click', startGame);
+    const startScreen = document.getElementById('start-screen');
+    if (startScreen) {
+        startScreen.addEventListener('click', () => {
+            console.log('Start screen clicked!');
+            startGame();
+        });
+        console.log('Start screen listener added');
+    }
 }
 
 function createLighting() {
