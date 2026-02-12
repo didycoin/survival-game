@@ -545,6 +545,12 @@ function createAnimal(x, z) {
 function setupEventListeners() {
     // Keyboard
     document.addEventListener('keydown', (e) => {
+        // Don't process keys until game has started
+        const startScreen = document.getElementById('start-screen');
+        if (startScreen.style.display !== 'none') {
+            return;
+        }
+        
         controls[e.key.toLowerCase()] = true;
         
         // Menu navigation
