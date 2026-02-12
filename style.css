@@ -146,49 +146,88 @@ body {
     font-weight: bold;
 }
 
-/* Inventory */
-#inventory {
+/* Inventory Menu (Rust style) */
+#inventory-menu {
     position: absolute;
-    bottom: 20px;
-    left: 20px;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 15px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.95);
+    padding: 20px;
     border-radius: 10px;
     color: white;
-    min-width: 300px;
-    max-width: 400px;
+    width: 80%;
+    max-width: 1000px;
+    max-height: 80vh;
+    overflow: hidden;
 }
 
-#inventory h3 {
-    margin-bottom: 10px;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
-    padding-bottom: 5px;
-}
-
-#inventory-items {
+.inventory-container {
     display: flex;
-    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 15px;
+}
+
+.inventory-left, .inventory-right {
+    flex: 1;
+}
+
+.inventory-left {
+    border-right: 2px solid rgba(255, 255, 255, 0.2);
+    padding-right: 20px;
+}
+
+#inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.inventory-right {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+#close-inventory {
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+#close-inventory:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .inventory-item {
     background: rgba(255, 255, 255, 0.1);
-    padding: 8px 12px;
+    padding: 15px;
     border-radius: 5px;
     font-size: 0.9em;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 5px;
+    justify-content: center;
+    gap: 8px;
     transition: all 0.2s;
+    text-align: center;
+    min-height: 100px;
 }
 
 .inventory-item.consumable {
     background: rgba(100, 200, 100, 0.2);
+    border: 2px solid rgba(100, 200, 100, 0.4);
 }
 
 .inventory-item.equipable {
     background: rgba(200, 150, 100, 0.2);
-    border: 1px solid rgba(200, 150, 100, 0.3);
+    border: 2px solid rgba(200, 150, 100, 0.3);
 }
 
 .inventory-item.equipable:hover {
@@ -198,19 +237,20 @@ body {
 
 .inventory-item.equipped {
     background: rgba(255, 215, 0, 0.3);
-    border: 2px solid rgba(255, 215, 0, 0.8);
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+    border: 3px solid rgba(255, 215, 0, 0.8);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
 }
 
 .inventory-item .item-count {
-    background: rgba(255, 255, 255, 0.2);
-    padding: 2px 6px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 4px 8px;
     border-radius: 3px;
     font-weight: bold;
+    font-size: 1.1em;
 }
 
-/* Crafting Menu */
-#crafting-menu, #build-menu {
+/* Build Menu */
+#build-menu {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -225,13 +265,13 @@ body {
     overflow-y: auto;
 }
 
-#crafting-menu h3, #build-menu h3 {
+#build-menu h3 {
     margin-bottom: 15px;
     border-bottom: 2px solid rgba(255, 255, 255, 0.3);
     padding-bottom: 10px;
 }
 
-#crafting-recipes, #building-options {
+#building-options {
     margin-bottom: 15px;
 }
 
@@ -275,7 +315,7 @@ body {
     color: #aaa;
 }
 
-#close-crafting, #close-build {
+#close-build {
     width: 100%;
     padding: 10px;
     background: rgba(255, 255, 255, 0.2);
@@ -286,7 +326,7 @@ body {
     font-size: 1em;
 }
 
-#close-crafting:hover, #close-build:hover {
+#close-build:hover {
     background: rgba(255, 255, 255, 0.3);
 }
 
